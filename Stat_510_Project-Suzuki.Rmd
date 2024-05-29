@@ -1,0 +1,333 @@
+---
+title: "Stat_510_Project_Suzuki"
+author: "Cory Suzuki"
+date: "2024-04-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(writexl)
+library(readxl)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(car)
+library(olsrr)
+library(glmnet)
+library(factoextra)
+library(ggfortify)
+library(MASS)
+library(HH)
+library(caret)
+
+ment_data = read_csv("C:/Users/coryg/Downloads/mxmh_survey_results.csv", col_names=T)
+
+set.seed(123)
+#train_ind = sample(seq_len(nrow(df_ment2)),size = sample_size)
+
+#train_set = df_ment2[train_ind, ]
+#test_set = df_ment2[-train_ind, ]
+
+train_index = caret::createDataPartition(ment_data$`Hours per day`, p=.8, list=F, times = 1)
+#head(train_index)
+
+train_set = ment_data[train_index, ]
+test_set = ment_data[-train_index, ]
+
+resp_ment = as.integer(train_set$`Hours per day`)
+expl_ment_age = scale(train_set$Age, scale=T)
+expl_ment_working = as.factor(train_set$`While working`)
+expl_ment_foreign = as.factor(train_set$`Foreign languages`)
+expl_ment_new = as.factor(train_set$Exploratory)
+expl_ment_anx = scale(train_set$Anxiety, scale=T)
+expl_ment_dep = scale(train_set$Depression, scale=T)
+expl_ment_insom = scale(train_set$Insomnia, scale=T)
+expl_ment_ocd = scale(train_set$OCD, scale=T)
+
+resp_ment_test = as.integer(test_set$`Hours per day`)
+expl_ment_age_test = scale(test_set$Age, scale=T)
+expl_ment_working_test = as.factor(test_set$`While working`)
+expl_ment_foreign_test = as.factor(test_set$`Foreign languages`)
+expl_ment_new_test = as.factor(test_set$Exploratory)
+expl_ment_anx_test = scale(test_set$Anxiety, scale=T)
+expl_ment_dep_test = scale(test_set$Depression, scale=T)
+expl_ment_insom_test = scale(test_set$Insomnia, scale=T)
+expl_ment_ocd_test = scale(test_set$OCD, scale=T)
+
+
+df_ment = train_set %>% select_if(~ !any(is.na(.)))
+
+df_ment_test = test_set %>% select_if(~ !any(is.na(.)))
+
+df_ment$`While working` = ifelse(df_ment$`While working` == "No",0,1)
+
+df_ment_test$`While working`= ifelse(df_ment_test$`While working` == "No", 0,1)
+
+df_ment$Exploratory = ifelse(df_ment$Exploratory == "No",0,1)
+
+df_ment_test$Exploratory = ifelse(df_ment_test$Exploratory == "No",0,1)
+
+df_ment$`Foreign languages` = ifelse(df_ment$`Foreign languages` == "No", 0,1)
+
+df_ment_test$`Foreign languages` = ifelse(df_ment_test$`Foreign languages` == "No",0,1)
+
+df_ment2 = df_ment %>% dplyr::select(-c("Fav genre", "Timestamp", "Permissions", "Frequency [Classical]", "Frequency [Country]", "Frequency [EDM]", "Frequency [Folk]", "Frequency [Gospel]", "Frequency [Hip hop]", "Frequency [Jazz]", "Frequency [K pop]", "Frequency [Latin]", "Frequency [Lofi]", "Frequency [Metal]", "Frequency [Pop]", "Frequency [R&B]", "Frequency [Rap]", "Frequency [Rock]", "Frequency [Video game music]", "Instrumentalist", "Composer"))
+
+df_ment3 = df_ment_test %>% dplyr::select(-c("Fav genre", "Timestamp", "Permissions", "Frequency [Classical]", "Frequency [Country]", "Frequency [EDM]", "Frequency [Folk]", "Frequency [Gospel]", "Frequency [Hip hop]", "Frequency [Jazz]", "Frequency [K pop]", "Frequency [Latin]", "Frequency [Lofi]", "Frequency [Metal]", "Frequency [Pop]", "Frequency [R&B]", "Frequency [Rap]", "Frequency [Rock]", "Frequency [Video game music]", "Instrumentalist", "Composer"))
+
+print(df_ment2)
+print(df_ment3)
+
+#Exploratory Data Analysis of Training Set
+
+#Plots of response variable and predictor variables.
+
+hist(resp_ment, main="Hours listened to music", xlab="Hours", col= "magenta")
+hist(expl_ment_anx, main="Anxiety Score (Scale from 0 to 10)", xlab="Score", col="blue")
+hist(expl_ment_dep, main="Depression Score (Scale from 0 to 10)", xlab="Score",col="red")
+hist(expl_ment_insom, main="Insomnia Score (Scale from 0 to 10)", xlab="Score", col="purple")
+hist(expl_ment_ocd, main="OCD Score (Scale from 0 to 10)", xlab="Score", col="yellow")
+
+ggplot(data=df_ment2) + geom_bar(mapping=aes(x = expl_ment_foreign))
+ggplot(data=df_ment2) + geom_bar(mapping=aes(x = expl_ment_working))
+
+#Split the clean data into 80% training set and 20% testing set.
+
+#sample_size = floor(nrow(df_ment2)*0.80)
+
+#set.seed(123)
+#train_ind = sample(seq_len(nrow(df_ment2)),size = sample_size)
+
+#train_set = df_ment2[train_ind, ]
+#test_set = df_ment2[-train_ind, ]
+
+#train_index = caret::createDataPartition(resp_ment, p=.8, list=F, times = 1)
+#head(train_index)
+
+#train_set = df_ment2[train_index, ]
+#test_set = df_ment2[-train_index, ]
+
+#print(train_set)
+#print(test_set)
+
+#print(train_set)
+
+#Checking for Multicollinearity
+
+#No strong multicollinearity detected in the three different methods.
+
+pairs(df_ment2)
+
+corr_ment = cor(df_ment2[,1:7])
+corr_ment
+
+inv_corr_ment = solve(corr_ment)
+inv_corr_ment
+
+#Attempted MLR, R^2 = 0.112
+
+mod_ment = lm(resp_ment~expl_ment_age+expl_ment_working+expl_ment_foreign+expl_ment_new+expl_ment_anx+expl_ment_dep+expl_ment_ocd+expl_ment_insom, data=df_ment2)
+
+summary(mod_ment)
+
+plot(mod_ment)
+
+plot(ols_step_best_subset(mod_ment))
+
+mod_ment2 = lm(resp_ment~expl_ment_working+expl_ment_new+expl_ment_ocd+expl_ment_insom, data=df_ment2)
+
+summary(mod_ment2)
+
+plot(mod_ment2)
+
+plot(ols_step_best_subset(mod_ment2))
+
+#car::avPlots(mod_ment)
+
+#Check for violation of error assumption.
+
+#From QQ plot and standardized residuals, we notice that for a 
+#multiple linear regression model, there is a violation of the errors.
+#The errors look like they follow a Poisson distribution, hence
+#we consider a Poisson regression model where Y is Poisson distributed with
+#the logistic link function.
+
+plot(mod_ment)
+
+studentized = rstudent(mod_ment)
+print(summary(studentized))
+plot(studentized)
+
+#Fitted Poisson regression model (base), AIC = 3407.2, Null dev. = 1560.2
+#res dev. = 1312.4
+
+
+poisson_mod_ment = glm(resp_ment~expl_ment_age+expl_ment_working+expl_ment_foreign+expl_ment_new+expl_ment_anx+expl_ment_dep+expl_ment_ocd + expl_ment_insom, data = df_ment2, family = poisson(link = "log"))
+
+summary(poisson_mod_ment)
+anova(poisson_mod_ment)
+
+#After coefficient analysis, remove insignificant terms age and primary 
+#streaming service. Now consider quadratic and interaction terms
+#for significant predictors, done in hierarchal fashion.
+
+#Poisson regression model with Null dev. = 1560.2, res. dev. = 1315.4
+#AIC = 3409.2
+
+#Coefficients still significant.
+
+poisson_mod_ment_v1 = glm(resp_ment~(expl_ment_working)^2+(expl_ment_new)^2+(expl_ment_anx)^2+(expl_ment_dep)^2+(expl_ment_ocd)^2 + (expl_ment_insom)^2, data = df_ment2, family = poisson(link = "log"))
+
+summary(poisson_mod_ment_v1)
+anova(poisson_mod_ment_v1)
+
+plot(poisson_mod_ment_v1)
+
+plot(ols_step_best_subset(poisson_mod_ment_v1))
+print(summary(ols_step_best_subset(poisson_mod_ment_v1)))
+
+#Now hypothesize interaction between mental illness scores and remove squares
+#for non-score predictors. AIC = 3379.1, improvement in squaring score predictors 
+#and modeling interactions between them.
+
+#Question: Can we make this model even better?
+
+poisson_mod_ment_v2 = glm(resp_ment~expl_ment_working+expl_ment_new+(expl_ment_anx)^2+(expl_ment_dep)^2+(expl_ment_ocd)^2 + (expl_ment_insom)^2 + (expl_ment_anx)*(expl_ment_dep)*(expl_ment_ocd)*(expl_ment_insom), data = df_ment2, family = poisson(link="log"))
+
+summary(poisson_mod_ment_v2)
+
+plot(poisson_mod_ment_v2)
+
+#plot(ols_step_best_subset(poisson_mod_ment_v2))
+#anova(poisson_mod_ment_v2)
+
+#plot(poisson_mod_ment_v2)
+
+studentized2 = rstudent(poisson_mod_ment_v2)
+print(summary(studentized2))
+plot(studentized2)
+
+#poisson_mod_ment_v3 = glm(resp_ment~expl_ment_working+expl_ment_new+(expl_ment_anx)^8+(expl_ment_dep)^8+(expl_ment_ocd)^8 + (expl_ment_insom)^8 + (expl_ment_anx)*(expl_ment_dep)*(expl_ment_ocd)*(expl_ment_insom), data = df_ment2, family = poisson(link = "log"))
+
+#summary(poisson_mod_ment_v3)
+
+poisson_mod_ment_v4 = glm(resp_ment~expl_ment_working+expl_ment_new+expl_ment_insom, family=poisson(link="log"), data=df_ment2)
+
+summary(poisson_mod_ment_v4)
+
+#plot(neg_bin_reg2)
+#studentized3 = rstudent(neg_bin_reg2)
+#print(summary(studentized3))
+#plot(studentized3)
+
+
+#Using best subset method to see which is the best model to select.
+
+#olsrr::ols_step_all_possible(poisson_mod_ment)
+#plot(ols_step_all_possible(poisson_mod_ment))
+
+#ols_step_best_subset(poisson_mod_ment)
+#plot(ols_step_best_subset(poisson_mod_ment))
+
+#Quadratic model took too long using best subset, so after model specification
+#success, we consider Boxcox and ironing out any multicollinearity issues.
+
+#ols_step_best_subset(poisson_mod_ment_v2)
+#plot(ols_step_best_subset(poisson_mod_ment_v2))
+
+
+#Cannot use Box-Cox transformation algorithm to transform "Y" into higher
+#order regression model. Investigation on applying to Poisson.
+
+#boxcox(poisson_mod_ment_v2, lambda=seq(-10,2,1/10))
+
+#boxcox_poisson = glm(resp_ment~expl_ment_working+expl_ment_new+(expl_ment_anx)^2+(expl_ment_dep)^2+(expl_ment_ocd)^2 + (expl_ment_insom)^2 + (expl_ment_anx)*(expl_ment_dep)*(expl_ment_ocd)*(expl_ment_insom), data = df_ment2, family = poisson(link = "log"))
+
+#summary(boxcox_poisson)
+
+
+#Solving multicollinearity issue(s) by using Principal Components Analysis, 
+#considering using Lasso regularized regression on 
+
+#Built Poisson model.
+
+#poisson_pca = prcomp(df_ment2,scale = TRUE)
+
+#Ask Dr. Suaray how to continue PCA, unclear at this point.
+
+#Attempt at lasso regression on a poisson model.
+
+#x = data.matrix(df_ment2[, 2:7])
+
+#cv_model = cv.glmnet(x, resp_ment, alpha = 1)
+#best_lambda = cv_model$lambda.min
+#best_lambda
+
+#plot(cv_model)
+
+#best_model = glmnet(x, resp_ment, alpha = 1, lambda = best_lambda)
+#coef(best_model)
+
+#Principal Components Analysis
+
+poisson_pca = prcomp(df_ment2, scale = TRUE)
+summary(poisson_pca)
+print(poisson_pca)
+
+#From PCA, we see that the least difference in cumulative proportion lies between PC6 and PC7.
+
+
+#Tests for Heteroscedasticity (Brown-Forsythe)
+#yc_lin = 3
+
+#indc_lin = as.factor(c(mod_ment$fitted.values>yc_lin))
+#print(indc_lin)
+#print(mod_ment$fitted.values)
+#indc_lin = as.factor(c(mod_ment$fitted.values > median(mod_ment$fitted.values)))
+#gra_lin = cbind(df_ment2, indc_lin, mod_ment$fitted.values)
+#gra_lin[indc_lin==T,]
+#HH::hovBF(resp_ment~indc_lin, data=gra_lin)
+
+#After confirming the model, we use the test set of the data to make predictions
+#on how many hours a user listens to music, the main goal of the project.
+
+poisson_mod_ment_pred = glm(resp_ment~expl_ment_working+expl_ment_new+expl_ment_insom, family=poisson(link="log"), data=df_ment3)
+
+pred_poisson = predict(poisson_mod_ment_pred,interval = "predict", newdata = df_ment3, type="response")
+print(pred_poisson)
+
+histogram(pred_poisson)
+
+#plot(pred_poisson)
+
+#Comparison of AIC values between linear model, poisson model 1, and poisson model 2.
+
+AIC(mod_ment)
+AIC(mod_ment2)
+AIC(poisson_mod_ment_v1)
+AIC(poisson_mod_ment_v2)   #best Poisson model
+AIC(poisson_mod_ment_v4)
+
+#Poisson regression model with four predictors has lowest AIC. 
+#used model for prediction of hours listened to music.
+
+#Now we detect any outliers in the data (use Boxplot)
+#According to residuals vs. fitted values, we see there are influential outliers.
+
+boxplot(poisson_mod_ment_v2$residuals)
+boxplot(poisson_mod_ment_v2$fitted.values)
+boxplot(df_ment2)
+
+df_ment2 = df_ment2[-294, ]
+df_ment3 = df_ment3[-294, ]
+df_ment2 = df_ment2[-556, ]
+df_ment3 = df_ment3[-556, ]
+df_ment2 = df_ment2[-529, ]
+df_ment3 = df_ment3[-529, ]
+
+```
