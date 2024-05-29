@@ -1,2 +1,3 @@
 # STAT_510_Mental_Health
 A Statistical analysis of mental health data pulled from Kaggle using a multiple linear regression model and a Poisson regression model to predict the amount of hours an individual will listen to music for mental health treatment.
+I fitted a multiple linear regression model and Poisson regression model to fit the dataset after cleaning. Models were checked and validated for goodness of fit by investigating the Akaike Information Criterion, Bayesian Information Criterion, and Analysis of Deviance table output. I also conducted residual exploratory data analysis to ensure Poisson regression assumptions are appropriately met. 
